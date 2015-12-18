@@ -45,25 +45,13 @@ main = do
     Just (userKey :: RSAPubKey) -> do
       let protected = b64 (header userKey nonce_)
 
---------------------------------------------------------------------------------
       -- Create user account
+      signPayload "registration" userKey protected (registration email)
 
-      let payload = registration email
-      writePayload "registration" protected payload
-      sig <- sign "registration"
-      writeBody "registration" userKey protected payload sig
-
---------------------------------------------------------------------------------
       -- Obtain a challenge
+      signPayload "challenge-request" userKey protected (authz domain)
 
-      let payload = authz domain
-      writePayload "challenge-request" protected payload
-      sig <- sign "challenge-request"
-      writeBody "challenge-request" userKey protected payload sig
-
---------------------------------------------------------------------------------
       -- Answser the challenge
-
       let thumb = thumbprint (JWK (rsaE userKey) "RSA" (rsaN userKey))
           -- Extracted from POST response above.
           token = "DjyJpI3HVWAmsAwMT5ZFpW8dj19cel6ml6qaBUeGpCg"
@@ -73,28 +61,23 @@ main = do
         BC.unpack token)
       putStrLn ("With content:\n" ++ BC.unpack thumbtoken)
 
---------------------------------------------------------------------------------
       -- Notify Let's Encrypt we answsered the challenge
+      signPayload "challenge-response" userKey protected (challenge thumbtoken)
 
-      let payload = challenge thumbtoken
-      writePayload "challenge-response" protected payload
-      sig <- sign "challenge-response"
-      writeBody "challenge-response" userKey protected payload sig
-
---------------------------------------------------------------------------------
       -- Wait for challenge validation
 
---------------------------------------------------------------------------------
       -- Send a CSR and get a certificate
-
       csr_ <- B.readFile (domain ++ ".csr.der")
+      signPayload "csr-request" userKey protected (csr csr_)
 
-      let payload = csr csr_
-      writePayload "csr-request" protected payload
-      sig <- sign "csr-request"
-      writeBody "csr-request" userKey protected payload sig
 
 --------------------------------------------------------------------------------
+-- | Sign and write a payload to a file with a nonce-protected header.
+signPayload name key protected payload = do
+  writePayload name protected payload
+  sig <- sign name
+  writeBody name key protected payload sig
+
 -- | Write a payload to file with a nonce-protected header.
 writePayload name protected payload =
   LB.writeFile (name ++ ".txt") (LB.fromChunks [protected, ".", payload])
