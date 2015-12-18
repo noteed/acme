@@ -48,43 +48,21 @@ main = do
 --------------------------------------------------------------------------------
       -- Create user account
 
-      let reg = registration email
-          payload = b64 reg
-
-      -- Registration payload to sign with user key.
-      LB.writeFile "registration.txt"
-        (LB.fromChunks [protected, ".", payload])
-
-      -- Sign with user key.
-      sign "registration.txt" "registration.sig"
-      sig_ <- B.readFile "registration.sig"
-      let sig = b64 sig_
-
-      -- Registration POST body.
-      LB.writeFile "registration.body"
-        (encode (Request (header' userKey) protected payload sig))
+      let payload = registration email
+      writePayload "registration" protected payload
+      sig <- sign "registration"
+      writeBody "registration" userKey protected payload sig
 
 --------------------------------------------------------------------------------
       -- Obtain a challenge
 
-      let auth = authz domain
-          payload = b64 auth
-
-      -- Challenge request payload to sign with user key.
-      LB.writeFile "challenge-request.txt"
-        (LB.fromChunks [protected, ".", payload])
-
-      -- Sign with user key.
-      sign "challenge-request.txt" "challenge-request.sig"
-      sig_ <- B.readFile "challenge-request.sig"
-      let sig = b64 sig_
-
-      -- Challenge request POST body.
-      LB.writeFile "challenge-request.body"
-        (encode (Request (header' userKey) protected payload sig))
+      let payload = authz domain
+      writePayload "challenge-request" protected payload
+      sig <- sign "challenge-request"
+      writeBody "challenge-request" userKey protected payload sig
 
 --------------------------------------------------------------------------------
-      -- Notify Let's Encrypt we answsered the challenge
+      -- Answser the challenge
 
       let thumb = thumbprint (JWK (rsaE userKey) "RSA" (rsaN userKey))
           -- Extracted from POST response above.
@@ -95,21 +73,13 @@ main = do
         BC.unpack token)
       putStrLn ("With content:\n" ++ BC.unpack thumbtoken)
 
-      let chall = challenge thumbtoken
-          payload = b64 chall
+--------------------------------------------------------------------------------
+      -- Notify Let's Encrypt we answsered the challenge
 
-      -- Challenge response payload to sign with user key.
-      LB.writeFile "challenge-response.txt"
-        (LB.fromChunks [protected, ".", payload])
-
-      -- Sign with user key.
-      sign "challenge-response.txt" "challenge-response.sig"
-      sig_ <- B.readFile "challenge-response.sig"
-      let sig = b64 sig_
-
-      -- Challenge response POST body. (Means the server can query our server.)
-      LB.writeFile "challenge-response.body"
-        (encode (Request (header' userKey) protected payload sig))
+      let payload = challenge thumbtoken
+      writePayload "challenge-response" protected payload
+      sig <- sign "challenge-response"
+      writeBody "challenge-response" userKey protected payload sig
 
 --------------------------------------------------------------------------------
       -- Wait for challenge validation
@@ -119,22 +89,36 @@ main = do
 
       csr_ <- B.readFile (domain ++ ".csr.der")
 
-      let csr = (toStrict . encode . CSR) (b64 csr_)
-          payload = b64 csr
+      let payload = csr csr_
+      writePayload "csr-request" protected payload
+      sig <- sign "csr-request"
+      writeBody "csr-request" userKey protected payload sig
 
-      -- CSR request payload to sign with user key.
-      LB.writeFile "csr-request.txt"
-        (LB.fromChunks [protected, ".", payload])
+--------------------------------------------------------------------------------
+-- | Write a payload to file with a nonce-protected header.
+writePayload name protected payload =
+  LB.writeFile (name ++ ".txt") (LB.fromChunks [protected, ".", payload])
 
-      -- Sign with user key.
-      sign "csr-request.txt" "csr-request.sig"
-      sig_ <- B.readFile "csr-request.sig"
-      let sig = b64 sig_
+-- | Sign a payload file using the user key.
+sign name = do
+  sign_ (name ++ ".txt") (name ++ ".sig")
+  sig_ <- B.readFile (name ++ ".sig")
+  return (b64 sig_)
 
-      -- CSR request POST body.
-      LB.writeFile "csr-request.body"
-        (encode (Request (header' userKey) protected payload sig))
+sign_ inp out = do
+  _ <- readProcess "openssl"
+    [ "dgst", "-sha256"
+    , "-sign", "user.key"
+    , "-out", out
+    , inp
+    ]
+    ""
+  return ()
 
+-- | Write a signed payload to a file. It can be used as the body of a POST
+-- request.
+writeBody name key protected payload sig = LB.writeFile (name ++ ".body")
+  (encode (Request (header' key) protected payload sig))
 
 --------------------------------------------------------------------------------
 -- | Base64URL encoding of Integer with padding '=' removed.
@@ -149,21 +133,17 @@ header' key = Header "RS256" (JWK (rsaE key) "RSA" (rsaN key)) Nothing
 header key nonce = (toStrict . encode)
   (Header "RS256" (JWK (rsaE key) "RSA" (rsaN key)) (Just nonce))
 
-registration email = (toStrict . encode) (Reg email terms)
+-- | Registration payload to sign with user key.
+registration email = (b64 . toStrict . encode) (Reg email terms)
 
-authz = toStrict . encode . Authz
+-- | Challenge request payload to sign with user key.
+authz = b64. toStrict . encode . Authz
 
-challenge = toStrict . encode . Challenge . BC.unpack
+-- | Challenge response payload to sign with user key.
+challenge = b64 . toStrict . encode . Challenge . BC.unpack
 
-sign inp out = do
-  _ <- readProcess "openssl"
-    [ "dgst", "-sha256"
-    , "-sign", "user.key"
-    , "-out", out
-    , inp
-    ]
-    ""
-  return ()
+-- | CSR request payload to sign with user key.
+csr = b64 . toStrict . encode . CSR . b64
 
 thumbprint = b64 . toStrict .bytestringDigest . sha256 . encodeOrdered
 
