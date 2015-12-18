@@ -40,24 +40,13 @@ openssl rsa -in user.key -pubout > user.pub
 ```
 
 
-## Generate nonces
-
-
-Each request to the API have a nonce to prevent replays. The nonce is currently
-hard-coded in the script. New nonces can be obtained from letsencrypt with
-
-```
-> generate-nonce.sh
-```
-
-
 ## Create user account
 
 Generate `registration.body` by using the `acme.hs` script then POST it to
 letsencrypt (note it assumes you agree to their subscriber agreement):
 
 ```
-> curl -s -X POST --data-binary "@registration.body" \
+> curl -s -X POST --data-binary "@<domain>/registration.body" \
   https://acme-v01.api.letsencrypt.org/acme/new-reg | json_pp
 {
    "agreement" : "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
@@ -83,7 +72,7 @@ Let's Encrypt needs a proof that you control the claimed domain. You can
 request a challenge with `challenge-request.body`.
 
 ```
-> curl -s -X POST --data-binary "@challenge-request.body" \
+> curl -s -X POST --data-binary "@<domain>/challenge-request.body" \
   https://acme-v01.api.letsencrypt.org/acme/new-authz | json_pp
 {
    "expires" : "2015-12-21T18:44:52.331487674Z",
@@ -125,7 +114,7 @@ script.
 Once this is done, you can ask Let's Encrypt to check the file.
 
 ```
-> curl -s -X POST --data-binary "@challenge-response.body" \
+> curl -s -X POST --data-binary "@<domain>/challenge-response.body" \
   https://acme-v01.api.letsencrypt.org/acme/challenge/vXZ1UnZ-y1q7sntnf6NdOfbPAwetJFBqOtvp7FHCjaU/1844048 | json_pp
 {
    "token" : "DjyJpI3HVWAmsAwMT5ZFpW8dj19cel6ml6qaBUeGpCg",
@@ -144,16 +133,14 @@ The same URL can then be polled until the status becomes valid.
 The CSR is created with:
 
 ```
-> openssl genrsa 4096 > domain.key
-> openssl req -new -sha256 -key domain.key -subj "/CN=aaa.reesd.com" > aaa.reesd.com.csr
-> openssl req -in aaa.reesd.com.csr -outform DER > aaa.reesd.com.csr.der
+> ./generate-csr.sh example.com
 ```
 
 And the signed certificate can be obtained from Let's Encrypt:
 
 ```
-> curl -s -X POST --data-binary "@csr-request.body" \
-  https://acme-v01.api.letsencrypt.org/acme/new-cert > aaa.reesd.com.cert.der
+> curl -s -X POST --data-binary "@<domain>/csr-request.body" \
+  https://acme-v01.api.letsencrypt.org/acme/new-cert > <domain>/cert.der
 ```
 
 
