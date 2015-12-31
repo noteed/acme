@@ -27,6 +27,7 @@ import Network.Http.Client
 import OpenSSL.EVP.PKey
 import OpenSSL.PEM (readPublicKey)
 import OpenSSL.RSA
+import System.Environment (getArgs)
 import System.IO.Streams (connect)
 import qualified System.IO.Streams as Streams
 import System.IO.Streams.Builder (builderStream)
@@ -38,15 +39,17 @@ import System.Process (readProcess)
 email :: String
 email = "noteed@gmail.com"
 
-domain :: String
-domain = "aaa.reesd.com"
-
 terms :: String
 terms = "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf"
+
+server :: ByteString
+-- server = "acme-staging.api.letsencrypt.org"
+server = "acme-v01.api.letsencrypt.org"
 
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
+  [domain] <- getArgs
   userKey_ <- readFile "user.pub" >>= readPublicKey
   case toPublicKey userKey_ of
     Nothing -> error "Not a public RSA key."
@@ -152,7 +155,7 @@ postBody' domain name url = do
 postBody_ domain name url = do
   content <- B.readFile (domain ++ "/" ++ name ++ ".body")
   ctx <- baselineContextSSL
-  c <- openConnectionSSL ctx "acme-v01.api.letsencrypt.org" 443
+  c <- openConnectionSSL ctx server 443
   q <- buildRequest $ do
     http POST url
     setContentType "application/json"
@@ -199,7 +202,7 @@ encodeOrdered JWK{..} = LC.pack $
 
 --------------------------------------------------------------------------------
 nonce = do
-  mnonce <- get "https://acme-v01.api.letsencrypt.org/directory"
+  mnonce <- get (BC.concat ["https://", server, "/directory"])
     (\r _ -> return (getHeader r "Replay-Nonce"))
   case mnonce of
     Nothing -> error "Can't get Nonce."

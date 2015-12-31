@@ -19,7 +19,7 @@ API endpoints are listed at https://acme-v01.api.letsencrypt.org/directory and
 are currently hard-coded in the script.
 
 ```
-> curl -s https://acme-v01.api.letsencrypt.org/directory | json_pp 
+> curl -s https://acme-v01.api.letsencrypt.org/directory | json_pp
 {
    "new-cert" : "https://acme-v01.api.letsencrypt.org/acme/new-cert",
    "new-authz" : "https://acme-v01.api.letsencrypt.org/acme/new-authz",
@@ -157,4 +157,41 @@ Including explicit DH key exchange parameters to prevent Logjam attack
     lets-encrypt-x1-cross-signed.pem \
     aaa.reesd.com.key \
     aaa.reesd.com-dhparams.pem > aaa.reesd.com-combined.pem
+```
+
+
+## Using the script `acme.hs`
+
+The example assumes you want to get a certificate for aaa.example.com.
+
+The first step is to ensure you can serve files at
+`http://aaa.example.com/.well-known/acme-challenge/`. To do so create a local
+directory called `aaa.example.com` containing a script called `serve.sh`. The
+script content is up to you and will be called by `acme.hs` to upload files to
+be server at the abore URL. A possible content could be:
+
+```
+> cat aaa.exampe.com/serve.sh
+#! /bin/bash
+
+scp $1 aaa.example.com:acme/static/.well-known/acme-challenge/$2
+```
+
+Second step is to generate a server private key and a CSR:
+
+```
+> ./generate-csr.sh aaa.example.com
+```
+
+Third step to is to actually using `acme.hs`:
+
+```
+> runghc acme.hs aaa.example.com
+```
+
+Fourth step is to use the certificate. For HAproxy, a script is given to help
+generate the appropriate file:
+
+```
+> ./generate-haproxy-cert.sh aaa.example.com
 ```
