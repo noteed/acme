@@ -147,7 +147,7 @@ And the signed certificate can be obtained from Let's Encrypt:
 ## Create a certificate for HAProxy
 
 Including explicit DH key exchange parameters to prevent Logjam attack
-(https://weakdh.org/).
+(https://weakdh.org/). See the script below.
 
 ```
 > openssl x509 -inform der -in aaa.reesd.com.cert.der \
@@ -195,3 +195,8 @@ generate the appropriate file:
 ```
 > ./generate-haproxy-cert.sh aaa.example.com
 ```
+
+TODO This scripts add a hard-coded Letsencrypt intermediate certificate but the
+actual certificate used by Letsencrypt to sign our certificate can vary. So
+this script should be modified to inspect the signed certificate and select the
+corresponding intermediate certificate (X2, X3, ...).
