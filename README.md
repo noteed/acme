@@ -195,8 +195,3 @@ generate the appropriate file:
 ```
 > ./generate-haproxy-cert.sh aaa.example.com
 ```
-
-TODO This scripts add a hard-coded Letsencrypt intermediate certificate but the
-actual certificate used by Letsencrypt to sign our certificate can vary. So
-this script should be modified to inspect the signed certificate and select the
-corresponding intermediate certificate (X2, X3, ...).
