@@ -58,7 +58,14 @@ main = do
       -- Create user account
       putStrLn "Creating user account..."
       signPayload (domain ++ "/registration") userKey (registration email)
-      (_ :: Value) <- postBody domain "registration" "/acme/new-reg"
+      r <- postBody domain "registration" "/acme/new-reg"
+      case sStatus r of
+        409 ->
+          -- Ignored, as this means "Registration key is already in use".
+          return ()
+        _ ->
+          -- TODO See later what onther values can be returned.
+          print r
 
       -- Obtain a challenge
       putStrLn "Obtaining challenge values..."
@@ -93,6 +100,11 @@ main = do
       putStrLn "Requesting certificate..."
       csr_ <- B.readFile (domain ++ "/domain.der")
       signPayload (domain ++ "/csr-request") userKey (csr csr_)
+      -- TODO Handle
+      --   "type": "urn:acme:error:rateLimited",
+      --   "detail": "Error creating new cert :: Too many certificates
+      --              already issued for exact set of domains: xxxxxx",
+      --   "status": 429
       content <- postBody' domain "csr-request" "/acme/new-cert"
       B.writeFile (domain ++ "/domain.cert.der") content
       putStrLn ("Certificate written to " ++ domain ++ "/domain.cert.der")
@@ -337,3 +349,18 @@ http01 ChallengeResponse{..} = case filter f rChallenges of
   [x] -> x
   _ -> error "No http-01 chanllenge."
   where f RegChallenge{..} = rType == "http-01"
+
+--------------------------------------------------------------------------------
+-- | Useful to recover only the status part of a response.
+data StatusResponse = StatusResponse
+  { sStatus :: Int
+  }
+  deriving Show
+
+instance FromJSON StatusResponse where
+  parseJSON (Object v) = do
+    status <- v .: "status"
+    return StatusResponse
+      { sStatus = status
+      }
+  parseJSON _ = mzero
