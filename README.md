@@ -186,7 +186,7 @@ Second step is to generate a server private key and a CSR:
 Third step to is to actually using `acme.hs`:
 
 ```
-> runghc acme.hs aaa.example.com
+> ./acme aaa.example.com
 ```
 
 Fourth step is to use the certificate. For HAproxy, a script is given to help
