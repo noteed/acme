@@ -9,8 +9,8 @@ Encrypt](https://letsencrypt.org/) using their ACME protocol.
 
 - The ACME spec: https://letsencrypt.github.io/acme-spec/
 
-Most values are still hard-coded for my initial attempt (i.e. my email address
-and a domain of mine).
+There is a more featureful fork of thisrepository at
+[afcady/acme](https://github.com/afcady/acme).
 
 
 ## Discover the URL for letsencrypt ACME endpoints
